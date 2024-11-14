@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas</title>
+</head>
+
+<body>
+    <div style="display: flex; align-items: start; gap: 10px;">
+        <canvas width="{{.N}}" height="{{.M}}"></canvas>
+        <button onclick="clearGrid()">clear</button>
+    </div>
+</body>
+
+<script>
+    const grid = JSON.parse('{{.Grid}}');
+    const dotSize = +'{{.DotSize}}';
+
+    const bgColor = '#515151ff';
+    const dotColor = 'white';
+
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const N = canvas.width / dotSize;
+    const M = canvas.height / dotSize;
+
+    const socket = new WebSocket('ws://127.0.0.1:8000/ws');
+</script>
+
+<script>
+    function drawGrid() {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = dotColor;
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < M; j++) {
+                const filled = grid[j + i * M];
+                if (!filled) continue;
+
+                ctx.fillRect(j * dotSize, i * dotSize, dotSize, dotSize);
+            }
+        }
+    }
+
+    function drawPoint(e) {
+        const rect = canvas.getBoundingClientRect();
+
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return;
+
+        const i = Math.floor(y / dotSize);
+        const j = Math.floor(x / dotSize);
+
+        const index = j + i * M;
+        const filled = grid[index];
+
+        if (filled) return;
+
+        socket.send(JSON.stringify({ index: index, fill: true, command: 'draw' }));
+    }
+
+    function clearGrid() {
+        socket.send(JSON.stringify({ command: 'clear' }));
+    }
+</script>
+
+<script>
+    drawGrid();
+
+    socket.addEventListener('open', function () {
+        console.log('Status: Connected');
+    });
+
+    socket.addEventListener('message', function (e) {
+        const data = JSON.parse(e.data);
+
+        if (data.command === 'draw') {
+            grid[data.index] = data.fill;
+        } else if (data.command === 'clear') {
+            grid.fill(false);
+        } else {
+            return;
+        }
+
+        drawGrid();
+    });
+
+    let pressed = false;
+
+    window.addEventListener("mousedown", function (e) {
+        pressed = true;
+
+        drawPoint(e);
+    }, false);
+
+    window.addEventListener("mouseup", function (e) {
+        pressed = false;
+    }, false);
+
+    window.addEventListener("mousemove", function (e) {
+        if (!pressed) return;
+
+        drawPoint(e);
+    }, false);
+</script>
+
+</html>
