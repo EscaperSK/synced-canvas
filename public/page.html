@@ -26,8 +26,46 @@
 
     const N = canvas.width / dotSize;
     const M = canvas.height / dotSize;
+</script>
 
-    const socket = new WebSocket('ws://127.0.0.1:8000/ws');
+<script>
+    let futureSocket = connectSocket();
+
+    /** @return {Promise<WebSocket>} */
+    async function connectSocket() {
+        return new Promise(resolve => {
+            const socket = new WebSocket('ws://127.0.0.1:{{.Port}}/ws');
+
+            socket.addEventListener('message', function (e) {
+                const data = JSON.parse(e.data);
+
+                if (data.command === 'draw') {
+                    grid[data.index] = data.fill;
+                } else if (data.command === 'clear') {
+                    grid.fill(false);
+                } else {
+                    return;
+                }
+
+                drawGrid();
+            });
+
+            socket.addEventListener('open', function () {
+                resolve(socket);
+            });
+        });
+    }
+
+    async function sendToSocket(data) {
+        let socket = await futureSocket;
+
+        if (socket.readyState === socket.CLOSING || socket.readyState === socket.CLOSED) {
+            futureSocket = connectSocket();
+            socket = await futureSocket;
+        }
+
+        socket.send(data);
+    }
 </script>
 
 <script>
@@ -62,34 +100,16 @@
 
         if (filled) return;
 
-        socket.send(JSON.stringify({ index: index, fill: true, command: 'draw' }));
+        sendToSocket(JSON.stringify({ index: index, fill: true, command: 'draw' }));
     }
 
     function clearGrid() {
-        socket.send(JSON.stringify({ command: 'clear' }));
+        sendToSocket(JSON.stringify({ command: 'clear' }));
     }
 </script>
 
 <script>
     drawGrid();
-
-    socket.addEventListener('open', function () {
-        console.log('Status: Connected');
-    });
-
-    socket.addEventListener('message', function (e) {
-        const data = JSON.parse(e.data);
-
-        if (data.command === 'draw') {
-            grid[data.index] = data.fill;
-        } else if (data.command === 'clear') {
-            grid.fill(false);
-        } else {
-            return;
-        }
-
-        drawGrid();
-    });
 
     let pressed = false;
 

@@ -14,11 +14,13 @@ var templ = template.Must(template.ParseFiles("public/page.html"))
 
 var grid = []bool{}
 
+const port = "8000"
+
 const n, m = 800, 800
 const dotSize = 2
 
 func Run() {
-	for i := 0; i < n*m; i++ {
+	for range n * m / (dotSize * dotSize) {
 		grid = append(grid, false)
 	}
 
@@ -34,11 +36,12 @@ func Run() {
 		}
 
 		data := struct {
+			Port    string
 			N       int
 			M       int
 			DotSize int
 			Grid    string
-		}{n, m, dotSize, string(s)}
+		}{port, n, m, dotSize, string(s)}
 
 		err = templ.ExecuteTemplate(w, "page.html", data)
 		if err != nil {
@@ -69,5 +72,5 @@ func Run() {
 		go c.Read(updateGrid, clearGrid)
 	})
 
-	http.ListenAndServe("127.0.0.1:8000", nil)
+	http.ListenAndServe("127.0.0.1:"+port, nil)
 }
